@@ -30,12 +30,10 @@
 #
 
 use strict;
-use Compress::Zlib;	# wishlist: Compress::Zopfli
+use Compress::Zlib qw(uncompress);
+use Compress::Zopfli::ZLIB qw(compress);
 
 my $verbose=0;
-
-my $zopfli="/usr/bin/zopfli";
-$zopfli=undef if ! -x $zopfli;
 
 while ($ARGV[0] eq '-v') {
   shift();
@@ -44,6 +42,7 @@ while ($ARGV[0] eq '-v') {
 
 my $f=$ARGV[0];
 my $d=$ARGV[1];
+my $it=$ARGV[2]||50;
 
 sub rb {
   my ($buf, $t);
@@ -139,18 +138,8 @@ for (my $i=0; $i<$WOFFHeader_numTables; $i++) {
     die("WOFF TableDirectoryEntry $i broken (length " . length($buffin) . " mismatches $WOFFTableDirectoryEntry_origLength)");
   }
 
-  if ($zopfli) {
-    my $tmpf="/tmp/woff-zopfli-".$$."-".rand();
-    open(TF, ">$tmpf") || die ("Unable to open temp file '$tmpf': " . $!);
-    print TF $buffin;
-    close(TF);
-    open(ZOPFLI, $zopfli." -c --zlib --i50 ".$tmpf."|") || die ("Unable to execute zopfli: " . $!);
-    $buffout = join("", <ZOPFLI>);
-    close(ZOPFLI);
-    unlink($tmpf);
-  } else {
-    $buffout = compress($buffin, Z_BEST_COMPRESSION);
-  }
+  $buffout = compress($buffin, { iterations => $it, blocksplitting => 0 });
+
   printf "Compressing TableDirectoryEntry %3d data (compLength: %6d, origLength: %6d)\n", $i, length($buffout), $WOFFTableDirectoryEntry_origLength if ($verbose>1);
 
   if (length($buffout) >= length($buffin)) {
