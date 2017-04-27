@@ -30,20 +30,36 @@
 #
 
 use strict;
-use Compress::Zlib;	# wishlist: Compress::Zopfli
+use Getopt::Long;
+use Fcntl qw(:flock);
+use Compress::Zlib qw(uncompress);
+use Compress::Zopfli::ZLIB qw(compress);
 
 my $verbose=0;
+my $overwrite=0;
+my $iterations=50;
 
-my $zopfli="/usr/bin/zopfli";
-$zopfli=undef if ! -x $zopfli;
+sub help {
+  print "
+  $0 [options] <input.woff|-> [output.woff|-]
 
-while ($ARGV[0] eq '-v') {
-  shift();
-  $verbose++;
-}
+  Options:
+    -i, --iterations    Maximum trials (default: 50)
+    -v, --verbose       Enable verbose mode (repeatable)
+";
+exit 1;
+};
+
+GetOptions(
+	'--help' => \&help,
+	'--verbose|v+' => sub { $verbose++ },
+	'--iterations|i=i' => \$iterations,
+);
 
 my $f=$ARGV[0];
-my $d=$ARGV[1];
+my $d=$ARGV[1]||$f;
+$f=\*STDIN if $f eq '-';
+$d=\*STDOUT if $d eq '-';
 
 sub rb {
   my ($buf, $t);
@@ -79,10 +95,12 @@ sub rs {
   return $n;
 }
 
-print ("Usage: $0 [-v [-v [-v]]] <input.woff> <output.woff>\n"), exit 1 if (!$d);
-
+$overwrite = $^O =~ /win/i ? lc $f eq lc $d : $f eq $d;
 open (IF, "<$f") || die ("Unable to open input file '$f': " . $!);
+flock(IF, LOCK_SH); binmode(IF);
+$d .= '.tmp' if $overwrite;
 open (OF, ">$d") || die ("Unable to open output '$d': " . $!);
+flock(OF, LOCK_EX); binmode(OF);
 my $ofpos=0;
 
 # WOFFHeader
@@ -139,18 +157,8 @@ for (my $i=0; $i<$WOFFHeader_numTables; $i++) {
     die("WOFF TableDirectoryEntry $i broken (length " . length($buffin) . " mismatches $WOFFTableDirectoryEntry_origLength)");
   }
 
-  if ($zopfli) {
-    my $tmpf="/tmp/woff-zopfli-".$$."-".rand();
-    open(TF, ">$tmpf") || die ("Unable to open temp file '$tmpf': " . $!);
-    print TF $buffin;
-    close(TF);
-    open(ZOPFLI, $zopfli." -c --zlib --i50 ".$tmpf."|") || die ("Unable to execute zopfli: " . $!);
-    $buffout = join("", <ZOPFLI>);
-    close(ZOPFLI);
-    unlink($tmpf);
-  } else {
-    $buffout = compress($buffin, Z_BEST_COMPRESSION);
-  }
+  $buffout = compress($buffin, { iterations => $iterations, blocksplitting => 0 });
+
   printf "Compressing TableDirectoryEntry %3d data (compLength: %6d, origLength: %6d)\n", $i, length($buffout), $WOFFTableDirectoryEntry_origLength if ($verbose>1);
 
   if (length($buffout) >= length($buffin)) {
@@ -188,3 +196,4 @@ if ($verbose) {
   printf "Original file size: %d, compressed size: %d (%0.2f%% reduction)\n", ( -s $f ), $ofpos, 100*(1-($ofpos / -s $f));
 }
 
+rename($d, $f) if ($overwrite)
