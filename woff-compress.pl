@@ -144,7 +144,7 @@ for (my $i=0; $i<$WOFFHeader_numTables; $i++) {
     open(TF, ">$tmpf") || die ("Unable to open temp file '$tmpf': " . $!);
     print TF $buffin;
     close(TF);
-    open(ZOPFLI, $zopfli." -c --zlib --i50 ".$tmpf."|") || die ("Unable to execute zopfli: " . $!);
+    open(ZOPFLI, $zopfli." -c --zlib --i50 ".$tmpf."|") || do { unlink($tmpf); die ("Unable to execute zopfli: " . $!); };
     $buffout = join("", <ZOPFLI>);
     close(ZOPFLI);
     unlink($tmpf);
