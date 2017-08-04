@@ -30,62 +30,62 @@
 #
 
 use strict;
-use Compress::Zlib;	# wishlist: Compress::Zopfli
+use Compress::Zlib;    # wishlist: Compress::Zopfli
 
-my $verbose=0;
+my $verbose = 0;
 
-my $zopfli="/usr/bin/zopfli";
-$zopfli=undef if ! -x $zopfli;
+my $zopfli = "/usr/bin/zopfli";
+$zopfli = undef if !-x $zopfli;
 
-while ($ARGV[0] eq '-v') {
-  shift();
-  $verbose++;
+while ( $ARGV[0] eq '-v' ) {
+    shift();
+    $verbose++;
 }
 
-my $f=$ARGV[0];
-my $d=$ARGV[1];
+my $f = $ARGV[0];
+my $d = $ARGV[1];
 
 sub rb {
-  my ($buf, $t);
-  my ($p, $l) = @_;
+    my ( $buf, $t );
+    my ( $p, $l ) = @_;
 
-  seek(IF, $p, 0) || die;
-  read(IF, $buf, $l);
-  $t=$buf;
-  $t=~s/[^[:print:]]+/./g;;
-  print "Reading " . sprintf("%6d", $l) . " bytes at offset " . sprintf("%7d", $p) . ": 0x" . sprintf("%-32s", unpack("H*", substr($buf, 0, 16))) . " (a '" . substr($t, 0, 16) . "') \n" if ($verbose>2);
-  return $buf;
+    seek( IF, $p, 0 ) || die;
+    read( IF, $buf, $l );
+    $t = $buf;
+    $t =~ s/[^[:print:]]+/./g;
+    print "Reading " . sprintf( "%6d", $l ) . " bytes at offset " . sprintf( "%7d", $p ) . ": 0x" . sprintf( "%-32s", unpack( "H*", substr( $buf, 0, 16 ) ) ) . " (a '" . substr( $t, 0, 16 ) . "') \n" if ( $verbose > 2 );
+    return $buf;
 }
 
 sub rl {
-  my ($buf, $n);
-  my ($p, $l) = @_;
+    my ( $buf, $n );
+    my ( $p, $l ) = @_;
 
-  seek(IF, $p, 0) || die;
-  read(IF, $buf, $l);
-  $n=unpack("L>*", $buf);
-  print "Reading " . sprintf("%6d", $l) . " bytes at offset " . sprintf("%7d", $p) . ": 0x" . sprintf("%-32s", unpack("H*",$buf)) . " (l " . $n . ")\n" if ($verbose>2);
-  return $n;
+    seek( IF, $p, 0 ) || die;
+    read( IF, $buf, $l );
+    $n = unpack( "L>*", $buf );
+    print "Reading " . sprintf( "%6d", $l ) . " bytes at offset " . sprintf( "%7d", $p ) . ": 0x" . sprintf( "%-32s", unpack( "H*", $buf ) ) . " (l " . $n . ")\n" if ( $verbose > 2 );
+    return $n;
 }
 
 sub rs {
-  my ($buf, $n);
-  my ($p, $l) = @_;
+    my ( $buf, $n );
+    my ( $p, $l ) = @_;
 
-  seek(IF, $p, 0) || die;
-  read(IF, $buf, $l);
-  $n=unpack("S>*", $buf);
-  print "Reading " . sprintf("%6d", $l) . " bytes at offset " . sprintf("%7d", $p) . ": 0x" . sprintf("%-32s", unpack("H*",$buf)) . " (s " . $n . ")\n" if ($verbose>2);
-  return $n;
+    seek( IF, $p, 0 ) || die;
+    read( IF, $buf, $l );
+    $n = unpack( "S>*", $buf );
+    print "Reading " . sprintf( "%6d", $l ) . " bytes at offset " . sprintf( "%7d", $p ) . ": 0x" . sprintf( "%-32s", unpack( "H*", $buf ) ) . " (s " . $n . ")\n" if ( $verbose > 2 );
+    return $n;
 }
 
-print ("Usage: $0 [-v [-v [-v]]] <input.woff> <output.woff>\n"), exit 1 if (!$d);
+print("Usage: $0 [-v [-v [-v]]] <input.woff> <output.woff>\n"), exit 1 if ( !$d );
 
-open (IF, "<$f") || die ("Unable to open input file '$f': " . $!);
+open( IF, "<$f" ) || die( "Unable to open input file '$f': " . $! );
 binmode(IF);
-open (OF, ">$d") || die ("Unable to open output '$d': " . $!);
+open( OF, ">$d" ) || die( "Unable to open output '$d': " . $! );
 binmode(OF);
-my $ofpos=0;
+my $ofpos = 0;
 
 # WOFFHeader
 #  0 UInt32	signature	0x774F4646 'wOFF'
@@ -102,94 +102,95 @@ my $ofpos=0;
 # 36 UInt32	privOffset	Offset to private data block, from beginning of WOFF file; zero if no private data block is present.
 # 40 UInt32	privLength	Length of private data block; zero if no private data block is present.
 
-die ("Error: Invalid magic\n") if (rb(0, 4) ne "wOFF");
+die("Error: Invalid magic\n") if ( rb( 0, 4 ) ne "wOFF" );
 
-my $WOFFHeader_numTables = rs(12, 2);
+my $WOFFHeader_numTables = rs( 12, 2 );
 
-print "Number of TableDirectory Entries: " . $WOFFHeader_numTables . "\n" if ($verbose>1);
+print "Number of TableDirectory Entries: " . $WOFFHeader_numTables . "\n" if ( $verbose > 1 );
 
 # copy header and TableDirectory
-$ofpos=44+5*4*$WOFFHeader_numTables;
-print OF rb(0, $ofpos);
+$ofpos = 44 + 5 * 4 * $WOFFHeader_numTables;
+print OF rb( 0, $ofpos );
 
 my @TableDirFix;
 
-for (my $i=0; $i<$WOFFHeader_numTables; $i++) {
+for ( my $i = 0 ; $i < $WOFFHeader_numTables ; $i++ ) {
 
-  print "Reading TableDirectoryEntry $i\n" if ($verbose>1);
+    print "Reading TableDirectoryEntry $i\n" if ( $verbose > 1 );
 
-  # WOFF TableDirectoryEntry
-  #  0 UInt32	tag		4-byte sfnt table identifier.
-  #  4 UInt32	offset		Offset to the data, from beginning of WOFF file.
-  #  8 UInt32	compLength	Length of the compressed data, excluding padding.
-  # 12 UInt32	origLength	Length of the uncompressed table, excluding padding.
-  # 14 UInt32	origChecksum	Checksum of the uncompressed table.
+    # WOFF TableDirectoryEntry
+    #  0 UInt32	tag		4-byte sfnt table identifier.
+    #  4 UInt32	offset		Offset to the data, from beginning of WOFF file.
+    #  8 UInt32	compLength	Length of the compressed data, excluding padding.
+    # 12 UInt32	origLength	Length of the uncompressed table, excluding padding.
+    # 14 UInt32	origChecksum	Checksum of the uncompressed table.
 
-  my $WOFFTableDirectoryEntry_offset     = rl(44+ 4+($i*5*4), 4);
-  my $WOFFTableDirectoryEntry_compLength = rl(44+ 8+($i*5*4), 4);
-  my $WOFFTableDirectoryEntry_origLength = rl(44+12+($i*5*4), 4);
+    my $WOFFTableDirectoryEntry_offset     = rl( 44 + 4 +  ( $i * 5 * 4 ), 4 );
+    my $WOFFTableDirectoryEntry_compLength = rl( 44 + 8 +  ( $i * 5 * 4 ), 4 );
+    my $WOFFTableDirectoryEntry_origLength = rl( 44 + 12 + ( $i * 5 * 4 ), 4 );
 
-  my $buffin = rb($WOFFTableDirectoryEntry_offset,  $WOFFTableDirectoryEntry_compLength);
-  my $buffout;
+    my $buffin = rb( $WOFFTableDirectoryEntry_offset, $WOFFTableDirectoryEntry_compLength );
+    my $buffout;
 
-  if ($WOFFTableDirectoryEntry_compLength < $WOFFTableDirectoryEntry_origLength) {
-    print "Uncompressing TableDirectoryEntry $i data (compLength: $WOFFTableDirectoryEntry_compLength, origLength: $WOFFTableDirectoryEntry_origLength)\n" if ($verbose>1);
-    $buffin = uncompress($buffin);
-  }
+    if ( $WOFFTableDirectoryEntry_compLength < $WOFFTableDirectoryEntry_origLength ) {
+        print "Uncompressing TableDirectoryEntry $i data (compLength: $WOFFTableDirectoryEntry_compLength, origLength: $WOFFTableDirectoryEntry_origLength)\n" if ( $verbose > 1 );
+        $buffin = uncompress($buffin);
+    }
 
-  if (length($buffin) != $WOFFTableDirectoryEntry_origLength) {
-    die("WOFF TableDirectoryEntry $i broken (length " . length($buffin) . " mismatches $WOFFTableDirectoryEntry_origLength)");
-  }
+    if ( length($buffin) != $WOFFTableDirectoryEntry_origLength ) {
+        die( "WOFF TableDirectoryEntry $i broken (length " . length($buffin) . " mismatches $WOFFTableDirectoryEntry_origLength)" );
+    }
 
-  if ($zopfli) {
-    my $tmpf="/tmp/woff-zopfli-".$$."-".rand();
-    open(TF, ">$tmpf") || die ("Unable to open temp file '$tmpf': " . $!);
-    print TF $buffin;
-    close(TF);
-    if (!open(ZOPFLI, $zopfli." -c --zlib --i50 ".$tmpf."|")) {
-      unlink($tmpf);
-      die ("Unable to execute zopfli: " . $!);
-    };
-    $buffout = join("", <ZOPFLI>);
-    close(ZOPFLI);
-    unlink($tmpf);
-  } else {
-    $buffout = compress($buffin, Z_BEST_COMPRESSION);
-  }
-  printf "Compressing TableDirectoryEntry %3d data (compLength: %6d, origLength: %6d)\n", $i, length($buffout), $WOFFTableDirectoryEntry_origLength if ($verbose>1);
+    if ($zopfli) {
+        my $tmpf = "/tmp/woff-zopfli-" . $$ . "-" . rand();
+        open( TF, ">$tmpf" ) || die( "Unable to open temp file '$tmpf': " . $! );
+        print TF $buffin;
+        close(TF);
+        if ( !open( ZOPFLI, $zopfli . " -c --zlib --i50 " . $tmpf . "|" ) ) {
+            unlink($tmpf);
+            die( "Unable to execute zopfli: " . $! );
+        }
+        $buffout = join( "", <ZOPFLI> );
+        close(ZOPFLI);
+        unlink($tmpf);
+    }
+    else {
+        $buffout = compress( $buffin, Z_BEST_COMPRESSION );
+    }
+    printf "Compressing TableDirectoryEntry %3d data (compLength: %6d, origLength: %6d)\n", $i, length($buffout), $WOFFTableDirectoryEntry_origLength if ( $verbose > 1 );
 
-  if (length($buffout) >= length($buffin)) {
-    $buffout = $buffin;
-  }
+    if ( length($buffout) >= length($buffin) ) {
+        $buffout = $buffin;
+    }
 
-  push @TableDirFix, pack("L>*", $ofpos, length($buffout));
+    push @TableDirFix, pack( "L>*", $ofpos, length($buffout) );
 
-  print OF $buffout;
-  my $pad = 4-length($buffout)%4;
-  $pad = 0 if ($pad>3);
-  print OF "\x00"x$pad;
-  $ofpos += $pad+length($buffout);
+    print OF $buffout;
+    my $pad = 4 - length($buffout) % 4;
+    $pad = 0 if ( $pad > 3 );
+    print OF "\x00" x $pad;
+    $ofpos += $pad + length($buffout);
 
 }
 
 # set correct offset and length info
-for (my $i=$WOFFHeader_numTables; $i>0; $i--) {
-  seek(OF, 44+4+(($i-1)*5*4), 0) || die;
-  print OF pop(@TableDirFix);
+for ( my $i = $WOFFHeader_numTables ; $i > 0 ; $i-- ) {
+    seek( OF, 44 + 4 + ( ( $i - 1 ) * 5 * 4 ), 0 ) || die;
+    print OF pop(@TableDirFix);
 }
 
 # set correct file length
-seek(OF, 8, 0) || die;
-print OF pack("L>*", $ofpos);
+seek( OF, 8, 0 ) || die;
+print OF pack( "L>*", $ofpos );
 
 # zero private and metadata data block head info
-seek(OF, 24, 0) || die;
-print OF "\x00"x20;
+seek( OF, 24, 0 ) || die;
+print OF "\x00" x 20;
 
-close (OF);
-close (IF);
+close(OF);
+close(IF);
 
 if ($verbose) {
-  printf "Original file size: %d, compressed size: %d (%0.2f%% reduction)\n", ( -s $f ), $ofpos, 100*(1-($ofpos / -s $f));
+    printf "Original file size: %d, compressed size: %d (%0.2f%% reduction)\n", ( -s $f ), $ofpos, 100 * ( 1 - ( $ofpos / -s $f ) );
 }
 
