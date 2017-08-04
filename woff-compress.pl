@@ -10,7 +10,7 @@
 # you need the command line application.
 #
 #
-# (C) 2015-2016 Hajo Noerenberg
+# (C) 2015-2017 Hajo Noerenberg
 #
 # http://www.noerenberg.de/
 # https://github.com/hn/woff-compress
@@ -82,7 +82,9 @@ sub rs {
 print ("Usage: $0 [-v [-v [-v]]] <input.woff> <output.woff>\n"), exit 1 if (!$d);
 
 open (IF, "<$f") || die ("Unable to open input file '$f': " . $!);
+binmode(IF);
 open (OF, ">$d") || die ("Unable to open output '$d': " . $!);
+binmode(OF);
 my $ofpos=0;
 
 # WOFFHeader
